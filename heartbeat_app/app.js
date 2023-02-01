@@ -5,7 +5,7 @@ const query = require('source-server-query');
 const childProcess = require('child_process')
 
 var serverHostname = 'localhost';
-var serverPort = process.env.RUST_SERVER_PORT;
+var queryPort = process.env.RUST_SERVER_QUERYPORT;
 var rconPort = process.env.RUST_RCON_PORT;
 var rconPassword = process.env.RUST_RCON_PASSWORD;
 
@@ -20,7 +20,7 @@ async function check_server () {
 	var pass = false;
 	var qo = null;
 
-	await query.info('127.0.0.1',serverPort, querytimeout).then((q) => { qo=q;  pass= true; } ).catch((error) => { return });
+	await query.info('127.0.0.1',queryPort, querytimeout).then((q) => { qo=q;  pass= true; } ).catch((error) => { return });
 	if (started) {
 		if (pass) {
 			if (debug) console.log(`Heartbeat::Running... (Players: ${qo.players})`)
