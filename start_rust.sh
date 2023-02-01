@@ -215,6 +215,7 @@ function add_argument_pair {
 ARGUMENTS=()
 
 add_argument_pair ARGUMENTS "+server.port" "RUST_SERVER_PORT"
+add_argument_pair ARGUMENTS "+server.queryport" "RUST_SERVER_QUERYPORT"
 add_argument_pair ARGUMENTS "+server.identity" "RUST_SERVER_IDENTITY"
 
 if [ -z "${RUST_LEVELURL}" ]; then
