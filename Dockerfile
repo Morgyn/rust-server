@@ -88,6 +88,7 @@ ENV PUID 1000
 ENV RUST_SERVER_STARTUP_ARGUMENTS "-batchmode -load -nographics +server.secure 1"
 ENV RUST_SERVER_IDENTITY "docker"
 ENV RUST_SERVER_PORT ""
+ENV RUST_SERVER_QUERYPORT ""
 ENV RUST_SERVER_SEED "12345"
 ENV RUST_SERVER_NAME "Rust Server [DOCKER]"
 ENV RUST_SERVER_DESCRIPTION "This is a Rust server running inside a Docker container!"
