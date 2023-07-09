@@ -212,6 +212,11 @@ function add_argument_pair {
         fi
 }
 
+# If levelurl is set, generate a seed hashed off the url
+if [ ! -z "${RUST_LEVELURL}" ]; then
+	RUST_LEVELURL_CRC=$(echo "${RUST_LEVELURL}" | cksum | cut -c 1-8)
+fi
+
 ARGUMENTS=()
 
 add_argument_pair ARGUMENTS "+server.port" "RUST_SERVER_PORT"
@@ -223,6 +228,7 @@ if [ -z "${RUST_LEVELURL}" ]; then
 	add_argument_pair ARGUMENTS "+server.seed" "RUST_SERVER_SEED"
 else
 	add_argument_pair ARGUMENTS "+server.levelurl" "RUST_LEVELURL"
+	add_argument_pair ARGUMENTS "+server.seed" "RUST_LEVELURL_CRC"
 fi
 
 add_argument_pair ARGUMENTS "+server.hostname" "RUST_SERVER_NAME"
