@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+var debug = process.env.RUST_RCON_DEBUG || 0;
+
 var argumentString = ''
 var args = process.argv.splice(process.execArgv.length + 2)
 for (var i = 0; i < args.length; i++) {
@@ -12,7 +14,7 @@ if (argumentString.length < 1) {
   process.exit()
 }
 
-console.log('RconApp::Relaying RCON command: ' + argumentString)
+if (debug) console.log('RconApp::Relaying RCON command: ' + argumentString);
 
 var serverHostname = 'localhost'
 var serverPort = process.env.RUST_RCON_PORT
@@ -20,6 +22,8 @@ var serverPassword = process.env.RUST_RCON_PASSWORD
 
 var messageSent = false
 var WebSocket = require('ws')
+var Identifier = Math.floor(Math.random() * 50000) + 10000
+
 var ws = new WebSocket('ws://' + serverHostname + ':' + serverPort + '/' + serverPassword)
 ws.on('open', function open () {
   setTimeout(function () {
@@ -28,7 +32,7 @@ ws.on('open', function open () {
     setTimeout(function () {
       ws.close(1000)
       setTimeout(function () {
-        console.log('RconApp::Command relayed')
+        if (debug) console.log('RconApp::Command relayed')
         process.exit()
       })
     }, 1000)
@@ -39,8 +43,9 @@ ws.on('message', function (data, flags) {
   try {
     var json = JSON.parse(data)
     if (json !== undefined) {
-      if (json.Message !== undefined && json.Message.length > 0) {
-        console.log('RconApp::Received message:', json.Message)
+      if (json.Message !== undefined && json.Message.length > 0 && json.Identifier == Identifier) {
+        if (debug) console.log('RconApp::Received message:')
+        console.log( json.Message )
       }
     } else console.log('RconApp::Error: Invalid JSON received')
   } catch (e) {
@@ -55,7 +60,7 @@ ws.on('error', function (e) {
 function createPacket (command) {
   var packet =
   {
-    Identifier: -1,
+    Identifier: Identifier,
     Message: command,
     Name: 'WebRcon'
   }
