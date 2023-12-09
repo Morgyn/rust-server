@@ -46,10 +46,11 @@ RUST_UPDATE_BRANCH (DEFAULT: "public" - Set to match the branch that you want to
 RUST_START_MODE (DEFAULT: "0" - Determines if the server should update and then start (0), only update (1) or only start (2))
 RUST_OXIDE_ENABLED (DEFAULT: "0" - Set to 1 to automatically install the latest version of Oxide)
 RUST_OXIDE_UPDATE_ON_BOOT (DEFAULT: "1" - Set to 0 to disable automatic update of Oxide on boot)
-RUST_OXIDE_GITHUB (DEFAULT: "0" - Set to 1 to pull from github rather than the umod website, requires RUST_OXIDE_ENABLED)
+RUST_OXIDE_GITHUB (DEFAULT: unset - Set to 1 to pull from github rather than the umod website, requires RUST_OXIDE_ENABLED)
 RUST_RCON_SECURE_WEBSOCKET (DEFAULT: "0" - Set to 1 to enable secure websocket connections to the RCON web interface)
 RUST_LEVELURL (DEFAULT: unset - Set to a custom map download URL for the server to use. Will disable seed and worldsize)
 RUST_HEARTBEAT (DEFAULT: "0" - Set to 1 to enable the heartbeat service which will forcibly quit the server if it becomes unresponsive to queries)
+RUST_RCON_DEBUG (DEFAULT: unset - Set to add debug messages to the rcon cli application)
 ```
 
 # Logging and rotating logs
