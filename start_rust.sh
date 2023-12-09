@@ -100,20 +100,15 @@ fi
 # Check if Oxide is enabled
 if [ "$RUST_OXIDE_ENABLED" = "1" ]; then
 	# Next check if Oxide doesn't' exist, or if we want to always update it
-	INSTALL_OXIDE="0"
-	if [ ! -f "/steamcmd/rust/Oxide.Compiler" ]; then
-		INSTALL_OXIDE="1"
-	fi
-	if [ "$RUST_OXIDE_UPDATE_ON_BOOT" = "1" ]; then
-		INSTALL_OXIDE="1"
-	fi
-
-	# If necessary, download and install latest Oxide
-	if [ "$INSTALL_OXIDE" = "1" ]; then
-		echo "Downloading and installing latest Oxide.."
+	if [ ! -f "/steamcmd/rust/Oxide.Compiler" ] || [ "$RUST_OXIDE_UPDATE_ON_BOOT" = "1" ]; then
+		
 		OXIDE_URL="https://umod.org/games/rust/download/develop"
+		if [ "$RUST_OXIDE_GITHUB" = "1" ]; then
+			OXIDE_URL="$(node /app/oxidegithub_app/app.mjs)"
+		fi
+		echo "Downloading and installing latest Oxide... (${OXIDE_URL})"	
 		curl -sL $OXIDE_URL | bsdtar -xvf- -C /steamcmd/rust/
-		chmod 755 /steamcmd/rust/CSharpCompiler.x86_x64 > /dev/null 2>&1 &
+		chmod 755 /steamcmd/rust/Oxide.Compiler > /dev/null 2>&1 &
 	fi
 fi
 
