@@ -43,11 +43,16 @@ WORKDIR /app/restart_app
 RUN npm install
 
 # Setup scheduling support
-ADD scheduler_app/ /app/scheduler_app/
-WORKDIR /app/scheduler_app
+ADD oxidegithub_app/ /app/oxidegithub_app/
+WORKDIR /app/oxidegithub_app
 RUN npm install
 
-# Setup scheduling support
+# Setup heartbeat
+ADD heartbeat_app/ /app/heartbeat_app/
+WORKDIR /app/heartbeat_app
+RUN npm install
+
+# Setup github oxide support
 ADD heartbeat_app/ /app/heartbeat_app/
 WORKDIR /app/heartbeat_app
 RUN npm install

@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@extractus/feed-extractor": "^7.0.8"
+  }
+}
