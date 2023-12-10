@@ -16,9 +16,6 @@ exit_handler()
 	killer=$!
 	wait "$killer"
 
-	# Stop the web server
-	pkill -f nginx
-
 	echo "Exiting.."
 	exit
 }
