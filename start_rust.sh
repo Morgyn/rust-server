@@ -58,7 +58,11 @@ fi
 
 # Install/update steamcmd
 echo "Installing/updating steamcmd.."
-curl -s http://media.steampowered.com/installer/steamcmd_linux.tar.gz | bsdtar -xvf- -C /steamcmd
+
+(
+	cd /steamcmd
+	curl -s http://media.steampowered.com/installer/steamcmd_linux.tar.gz | tar zxv
+)
 
 # Check which branch to use
 if [ ! -z ${RUST_BRANCH+x} ]; then
@@ -107,7 +111,10 @@ if [ "$RUST_OXIDE_ENABLED" = "1" ]; then
 			OXIDE_URL="$(node /app/oxidegithub_app/app.mjs)"
 		fi
 		echo "Downloading and installing latest Oxide... (${OXIDE_URL})"	
-		curl -sL $OXIDE_URL | bsdtar -xvf- -C /steamcmd/rust/
+		(
+			cd /steamcmd/rust/
+			curl -sL $OXIDE_URL | tar zxv 
+		)
 		chmod 755 /steamcmd/rust/Oxide.Compiler > /dev/null 2>&1 &
 	fi
 fi
@@ -244,8 +251,6 @@ fi
 
 child=$!
 wait "$child"
-
-pkill -f nginx
 
 echo "Exiting.."
 exit

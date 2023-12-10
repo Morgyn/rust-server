@@ -1,36 +1,15 @@
-FROM didstopia/base:nodejs-12-steamcmd-ubuntu-18.04
+FROM node:bookworm-slim
 
-LABEL maintainer="Didstopia <support@didstopia.com>"
+LABEL org.opencontainers.image.authors="morgyn@gmail.com"
 
-# Fix apt-get warnings
-ARG DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get upgrade -y && apt-get dist-upgrade -y && apt-get autoremove -y
 
-# Install dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-        nginx \
-        expect \
-        tcl \
-	libsdl2-2.0-0:i386 \
-        libgdiplus && \
-    rm -rf /var/lib/apt/lists/*
-
-# Remove default nginx stuff
-RUN rm -fr /usr/share/nginx/html/* && \
-	rm -fr /etc/nginx/sites-available/* && \
-	rm -fr /etc/nginx/sites-enabled/*
-
-# Install webrcon (specific commit)
-COPY nginx_rcon.conf /etc/nginx/nginx.conf
-RUN curl -sL https://github.com/Facepunch/webrcon/archive/24b0898d86706723d52bb4db8559d90f7c9e069b.zip | bsdtar -xvf- -C /tmp && \
-	mv /tmp/webrcon-24b0898d86706723d52bb4db8559d90f7c9e069b/* /usr/share/nginx/html/ && \
-	rm -fr /tmp/webrcon-24b0898d86706723d52bb4db8559d90f7c9e069b
-
-# Customize the webrcon package to fit our needs
-ADD fix_conn.sh /tmp/fix_conn.sh
-
-# Create the volume directories
-RUN mkdir -p /steamcmd/rust /usr/share/nginx/html /var/log/nginx
+RUN apt-get install -y \
+    lib32gcc-s1 \
+    lib32stdc++6 \
+    expect \
+    curl \
+    tar
 
 # Setup proper shutdown support
 ADD shutdown_app/ /app/shutdown_app/
@@ -77,13 +56,6 @@ COPY README.md LICENSE.md /app/
 
 # Set the current working directory
 WORKDIR /
-
-# Fix permissions
-RUN chown -R 1000:1000 \
-    /steamcmd \
-    /app \
-    /usr/share/nginx/html \
-    /var/log/nginx
 
 # Run as a non-root user by default
 ENV PGID 1000
