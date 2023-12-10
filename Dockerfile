@@ -9,37 +9,15 @@ RUN apt-get install -y \
     lib32stdc++6 \
     expect \
     curl \
-    tar
+    tar \
+    jq
+ 
+COPY apps /app/
+WORKDIR /app/
 
-# Setup proper shutdown support
-ADD shutdown_app/ /app/shutdown_app/
-WORKDIR /app/shutdown_app
-RUN npm install
+RUN jq -s 'reduce .[] as $d ({}; . *= $d)' */package.json >package.json &&\
+    npm install
 
-# Setup restart support (for update automation)
-ADD restart_app/ /app/restart_app/
-WORKDIR /app/restart_app
-RUN npm install
-
-# Setup scheduling support
-ADD oxidegithub_app/ /app/oxidegithub_app/
-WORKDIR /app/oxidegithub_app
-RUN npm install
-
-# Setup heartbeat
-ADD heartbeat_app/ /app/heartbeat_app/
-WORKDIR /app/heartbeat_app
-RUN npm install
-
-# Setup github oxide support
-ADD heartbeat_app/ /app/heartbeat_app/
-WORKDIR /app/heartbeat_app
-RUN npm install
-
-# Setup rcon command relay app
-ADD rcon_app/ /app/rcon_app/
-WORKDIR /app/rcon_app
-RUN npm install
 RUN ln -s /app/rcon_app/app.js /usr/bin/rcon
 
 # Add the steamcmd installation script
