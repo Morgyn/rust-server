@@ -1,0 +1,70 @@
+name: Manual Docker Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_name:
+        description: "Override image name (example: ghcr.io/owner/repo)"
+        required: false
+        type: string
+      tag:
+        description: "Optional custom tag (defaults to short SHA)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Compute image variables
+        id: vars
+        shell: bash
+        run: |
+          set -euo pipefail
+          default_image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          input_image="${{ inputs.image_name }}"
+          image_name="${input_image:-$default_image}"
+
+          short_sha="${GITHUB_SHA::7}"
+          input_tag="${{ inputs.tag }}"
+          image_tag="${input_tag:-$short_sha}"
+
+          echo "image_name=$image_name" >> "$GITHUB_OUTPUT"
+          echo "image_tag=$image_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ steps.vars.outputs.image_name }}
+          tags: |
+            type=raw,value=${{ steps.vars.outputs.image_tag }}
+            type=raw,value=latest
+
+      - name: Build and push image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

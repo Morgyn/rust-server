@@ -1,17 +1,19 @@
-FROM ubuntu:25.04
+FROM ubuntu:25.04 AS build
 
-LABEL org.opencontainers.image.authors="morgyn@gmail.com"
+#  _         _ _    _ 
+# | |__ _  _(_) |__| |
+# | '_ \ || | | / _` |
+# |_.__/\_,_|_|_\__,_|
+
+ENV NODE_ENV production
 
 RUN apt-get update && apt-get upgrade -y && apt-get dist-upgrade -y && apt-get autoremove -y
 
 RUN apt-get install -y \
-    lib32gcc-s1 \
-    lib32stdc++6 \
     nodejs \
-    npm \
-    curl \
-    tar \
     unzip \
+    npm \
+    wget \
     jq
  
 COPY apps /app/
@@ -21,16 +23,43 @@ WORKDIR /app/
 # This is to only install each package once, and keep image smaller
 RUN jq -s 'reduce .[] as $d ({}; . *= $d)' */package.json >package.json &&\
     npm install
+#    npm ci --only=production
+
+# Install Depot Downloader    
+RUN mkdir -p /depotdownloader
+WORKDIR /depotdownloader/
+
+RUN wget -O /tmp/DepotDownloader-linux-x64.zip https://github.com/SteamRE/DepotDownloader/releases/latest/download/DepotDownloader-linux-x64.zip &&\
+    unzip /tmp/DepotDownloader-linux-x64.zip
+
+FROM ubuntu:25.04
+
+LABEL org.opencontainers.image.authors="morgyn@gmail.com"
+
+#               _   _           
+#  _ _ _  _ _ _| |_(_)_ __  ___ 
+# | '_| || | ' \  _| | '  \/ -_)
+# |_|  \_,_|_||_\__|_|_|_|_\___|
+
+ENV NODE_ENV production
+
+COPY --from=build /app/ /app/
+COPY --from=build /depotdownloader/ /depotdownloader/
+
+RUN mkdir -p /rust
+
+RUN apt-get update && \
+    apt-get install -y \
+        nodejs \
+        busybox 
+
+RUN busybox --install    
 
 RUN ln -s /app/rcon_app/app.js /usr/bin/rcon
 
-RUN ln -s /app/new_rcon_app/app.js /usr/bin/new_rcon
-
 # Copy the Rust startup script
-ADD start_rust.sh /app/start.sh
-
-# Copy extra files
-COPY README.md LICENSE.md /app/
+ADD start_rust.sh /app/start_rust.sh
+RUN chmod +x /app/start_rust.sh /usr/bin/rcon
 
 # Set the current working directory
 WORKDIR /
@@ -44,9 +73,9 @@ ENV RUST_SERVER_STARTUP_ARGUMENTS "-batchmode -load +server.secure 1"
 ENV RUST_SERVER_IDENTITY "docker"
 ENV RUST_SERVER_PORT ""
 ENV RUST_SERVER_QUERYPORT ""
-ENV RUST_SERVER_SEED "12345"
+ENV RUST_SERVER_SEED "50000"
 ENV RUST_SERVER_NAME "Rust Server [DOCKER]"
-ENV RUST_SERVER_DESCRIPTION "This is a Rust server running inside a Docker container!"
+ENV RUST_SERVER_DESCRIPTION "Rust Server"
 ENV RUST_SERVER_URL ""
 ENV RUST_SERVER_BANNER_URL ""
 ENV RUST_RCON_WEB "1"
@@ -65,10 +94,7 @@ ENV RUST_SERVER_MAXPLAYERS "50"
 ENV RUST_SERVER_SAVE_INTERVAL "600"
 
 # Define directories to take ownership of
-ENV CHOWN_DIRS "/app,/steamcmd"
-
-# Expose the volumes
-# VOLUME [ "/steamcmd/rust" ]
+ENV CHOWN_DIRS "/app,/rust,/depotdownloader"
 
 # Start the server
-CMD [ "bash", "/app/start.sh"]
+CMD [ "bash", "/app/start_rust.sh"]

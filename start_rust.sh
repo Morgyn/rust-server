@@ -3,123 +3,103 @@
 # Enable debugging
 # set -x
 
-# Print the user we're currently running as
-echo "Running as user: $(whoami)"
-
 # Define the exit handler
 exit_handler()
 {
 	echo "Shutdown signal received"
 
+    ## TODO: Make shutdown into a bash function
 	# Execute the RCON shutdown command
 	node /app/shutdown_app/app.js
-	killer=$!
-	wait "$killer"
+	SHUTDOWN_PID=$!
+	wait "$SHUTDOWN_PID"
 
 	echo "Exiting.."
-	exit
+	exit 0
 }
-
-# Trap specific signals and forward to the exit handler
-trap 'exit_handler' SIGINT SIGTERM
-
-# Rust includes a 64-bit version of steamclient.so, so we need to tell the OS where it exists
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/steamcmd/rust/RustDedicated_Data/Plugins/x86_64
 
 # Define the install/update function
 install_or_update()
 {
-	# Install Rust from install.txt
-	echo "Installing or updating Rust.. (this might take a while, be patient)"
-	bash /steamcmd/steamcmd.sh +runscript /app/install.txt
+	INSTALL_ARGS=()
+	INSTALL_ARGS+=("-app 258550")
+	# INSTALL_ARGS+=("-depot 258552")
+	INSTALL_ARGS+=("-dir /rust/")
+	if [[ -n "${RUST_BRANCH}" && "${RUST_BRANCH}" != "public" ]]; then
+		INSTALL_ARGS+=("-beta ${RUST_BRANCH}")
+	fi
+	INSTALL_ARGS+=("-validate")
+
+	# Install Rust
+	echo "Installing or updating Rust.."
+	/depotdownloader/DepotDownloader "${INSTALL_ARGS[@]}"
 
 	# Terminate if exit code wasn't zero
 	if [ $? -ne 0 ]; then
-		echo "Exiting, steamcmd install or update failed!"
+		echo "Exiting, depot downloader install or update failed!"
 		exit 1
 	fi
 }
+
+# Preparing arguments
+function add_argument_pair {
+        local -n arr=$1
+        if  [ ! -z "${!3}" ]; then
+                  arr+=("${2}");
+                  arr+=("${!3}");
+        fi
+}
+
+# Print the user we're currently running as
+echo "Running as user: $(whoami)"
+
+# Update SSL just in case
+apt-get install -y ca-certificates
+update-ca-certificates --fresh
+
+# Trap specific signals and forward to the exit handler
+trap 'exit_handler' SIGINT SIGTERM
 
 # Remove old lock files (used by restart_app/ and update_check.sh)
 rm -fr /tmp/*.lock
 
 # Create the necessary folder structure
-if [ ! -d "/steamcmd/rust" ]; then
-	echo "Missing /steamcmd/rust, creating.."
-	mkdir -p /steamcmd/rust
-fi
-if [ ! -d "/steamcmd/rust/server/${RUST_SERVER_IDENTITY}" ]; then
-	echo "Missing /steamcmd/rust/server/${RUST_SERVER_IDENTITY}, creating.."
-	mkdir -p "/steamcmd/rust/server/${RUST_SERVER_IDENTITY}"
-fi
-
-# Install/update steamcmd
-echo "Installing/updating steamcmd.."
-
-(
-	cd /steamcmd
-	curl -s http://media.steampowered.com/installer/steamcmd_linux.tar.gz | tar zxv
-)
-
-# Check which branch to use
-if [ ! -z ${RUST_BRANCH+x} ]; then
-	echo "Using branch arguments: $RUST_BRANCH"
-
-	# Add "-beta" if necessary
-	INSTALL_BRANCH="${RUST_BRANCH}"
-	if [ ! "$RUST_BRANCH" == "public" ]; then
-	    INSTALL_BRANCH="-beta ${RUST_BRANCH}"
-	fi
-	sed -i "s/app_update 258550.*validate/app_update 258550 $INSTALL_BRANCH validate/g" /app/install.txt
-else
-	sed -i "s/app_update 258550.*validate/app_update 258550 validate/g" /app/install.txt
+if [ ! -d "/rust/server/${RUST_SERVER_IDENTITY}" ]; then
+	echo "Missing /rust/server/${RUST_SERVER_IDENTITY}, creating.."
+	mkdir -p "/rust/server/${RUST_SERVER_IDENTITY}"
 fi
 
 # Disable auto-update if start mode is 2
-if [ "$RUST_START_MODE" = "2" ]; then
-	# Check that Rust exists in the first place
-	if [ ! -f "/steamcmd/rust/RustDedicated" ]; then
-		install_or_update
-	else
-		echo "Rust seems to be installed, skipping automatic update.."
-	fi
+if [ "$RUST_START_MODE" = "2" ] && [ -f "/rust/RustDedicated" ]; then	
+	echo "Rust Start Mode set to 2 (Don't Update), Rust installed, skipping update.."
 else
 	install_or_update
-
-	# Run the update check if it's not been run before
-	if [ ! -f "/steamcmd/rust/build.id" ]; then
-		./app/update_check.sh
-	else
-		OLD_BUILDID="$(cat /steamcmd/rust/build.id)"
-		STRING_SIZE=${#OLD_BUILDID}
-		if [ "$STRING_SIZE" -lt "6" ]; then
-			./app/update_check.sh
-		fi
-	fi
 fi
 
 # Check if Oxide is enabled
 if [ "$RUST_OXIDE_ENABLED" = "1" ]; then
-	# Next check if Oxide doesn't' exist, or if we want to always update it
-	if [ ! -f "/steamcmd/rust/Oxide.Compiler" ] || [ "$RUST_OXIDE_UPDATE_ON_BOOT" = "1" ]; then
+	# Next check if Oxide doesn't exist, or if we want to always update it
+	if [ ! -f "/rust/RustDedicated_Data/Managed/Oxide.Core.dll" ] || [ "$RUST_OXIDE_UPDATE_ON_BOOT" = "1" ]; then
 		
 		OXIDE_URL="https://umod.org/games/rust/download/develop"
 		if [ "$RUST_OXIDE_GITHUB" = "1" ]; then
-			OXIDE_URL="$(node /app/oxidegithub_app/app.mjs)"
+			OXIDE_URL="https://github.com/OxideMod/Oxide.Rust/releases/latest/download/Oxide.Rust-linux.zip"
 		fi
-		echo "Downloading and installing latest Oxide... (${OXIDE_URL})"	
-		(
-			cd /steamcmd/rust/
-			curl -sL $OXIDE_URL | tar zxv 
-		)
-		chmod 755 /steamcmd/rust/Oxide.Compiler > /dev/null 2>&1 &
+
+		echo "Downloading and installing latest Oxide... (${OXIDE_URL})"
+
+		OXIDE_TEMP="$(mktemp)" && \
+			wget -O "${OXIDE_TEMP}" "${OXIDE_URL}" && \
+			unzip -o "${OXIDE_TEMP}" -d "/rust/" && \
+			rm -f "${OXIDE_TEMP}" || \
+			echo "Download and install of oxide FAILED"
 	fi
 fi
 
 # Start mode 1 means we only want to update
 if [ "$RUST_START_MODE" = "1" ]; then
-	echo "Exiting, start mode is 1.."
-	exit
+	echo "Exiting, Start Mode is 1 (Update Only).."
+	exit 0
 fi
 
 # Remove extra whitespace from startup command
@@ -133,24 +113,9 @@ if [ ! -z ${RUST_RCON_PASSWORD+x} ]; then
 	RUST_STARTUP_COMMAND="$RUST_STARTUP_COMMAND +rcon.password $RUST_RCON_PASSWORD"
 fi
 
-if [ ! -z ${RUST_RCON_WEB+x} ]; then
-	RUST_STARTUP_COMMAND="$RUST_STARTUP_COMMAND +rcon.web $RUST_RCON_WEB"
-	if [ "$RUST_RCON_WEB" = "1" ]; then
-		# Fix the webrcon (customizes a few elements)
-		bash -c "RUST_RCON_SECURE_WEBSOCKET=${RUST_RCON_SECURE_WEBSOCKET} /tmp/fix_conn.sh"
-
-		# Start nginx (in the background)
-		echo "Starting web server.."
-		nginx
-		NGINX=$!
-		sleep 5
-	fi
-fi
-
 # Disable logrotate if "-logfile" is set in $RUST_STARTUP_COMMAND
 LOGROTATE_ENABLED=1
-RUST_STARTUP_COMMAND_LOWERCASE=`echo "$RUST_STARTUP_COMMAND" | sed 's/./\L&/g'`
-if [[ $RUST_STARTUP_COMMAND_LOWERCASE == *" -logfile "* ]]; then
+if [[ "${RUST_STARTUP_COMMAND,,}" == *" -logfile "* ]]; then
 	LOGROTATE_ENABLED=0
 fi
 
@@ -158,58 +123,37 @@ if [ "$LOGROTATE_ENABLED" = "1" ]; then
 	echo "Log rotation enabled!"
 
 	# Log to stdout by default
-	RUST_STARTUP_COMMAND="$RUST_STARTUP_COMMAND -logfile /dev/stdout"
-	echo "Using startup arguments: $RUST_SERVER_STARTUP_ARGUMENTS"
+	RUST_STARTUP_COMMAND="${RUST_STARTUP_COMMAND} -logfile /dev/stdout"
+	echo "Using startup arguments: ${RUST_SERVER_STARTUP_ARGUMENTS}"
 
 	# Create the logging directory structure
-	if [ ! -d "/steamcmd/rust/logs/archive" ]; then
-		mkdir -p /steamcmd/rust/logs/archive
+	if [ ! -d "/rust/logs/archive" ]; then
+		mkdir -p /rust/logs/archive
 	fi
 
 	# Set the logfile filename/path
 	DATE=`date '+%Y-%m-%d_%H-%M-%S'`
-	RUST_SERVER_LOG_FILE="/steamcmd/rust/logs/$RUST_SERVER_IDENTITY"_"$DATE.txt"
+	RUST_SERVER_LOG_FILE="/rust/logs/${RUST_SERVER_IDENTITY}_${DATE}.txt"
 
 	# Archive old logs
 	echo "Cleaning up old logs.."
-	mv /steamcmd/rust/logs/*.txt /steamcmd/rust/logs/archive | true
+	mv /rust/logs/*.txt /rust/logs/archive | true
 else
 	echo "Log rotation disabled!"
 fi
 
 # Disable logging to stdout/stderr if "-logfile /dev/" is used
 STDLOG_ENABLED=1
-if [[ $RUST_STARTUP_COMMAND_LOWERCASE == *" -logfile /dev/"* ]]; then
+if [[ "${RUST_STARTUP_COMMAND,,}" == *" -logfile /dev/"* ]]; then
 	echo "Disabling internal stdout/stderr logging!"
 	STDLOG_ENABLED=0
 fi
 
-# Start the scheduler (only if update checking is enabled)
-if [ "$RUST_UPDATE_CHECKING" = "1" ]; then
-	echo "Starting scheduled task manager.."
-	node /app/scheduler_app/app.js &
-fi
-
-# Start the heartbeat(only if enabled)
-if [ "$RUST_HEARTBEAT" = "1" ]; then
-	echo "Starting heartbeat.."
-	node /app/heartbeat_app/app.js &
-fi
-
 # Set the working directory
-cd /steamcmd/rust
+cd /rust
 
 # Run the server
 echo "Starting Rust.."
-
-# Preparing arguments
-function add_argument_pair {
-        local -n arr=$1
-        if  [ ! -z "${!3}" ]; then
-                  arr+=("${2}");
-                  arr+=("${!3}");
-        fi
-}
 
 # If levelurl is set, generate a seed hashed off the url
 if [ ! -z "${RUST_LEVELURL}" ]; then
@@ -238,16 +182,21 @@ add_argument_pair ARGUMENTS "+server.maxplayers" "RUST_SERVER_MAXPLAYERS"
 add_argument_pair ARGUMENTS "+server.saveinterval" "RUST_SERVER_SAVE_INTERVAL"
 add_argument_pair ARGUMENTS "+app.port" "RUST_APP_PORT"
 
+chmod +x /rust/RustDedicated
+
+# Rust includes a 64-bit version of steamclient.so, so we need to tell the OS where it exists
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/rust/RustDedicated_Data/Plugins/x86_64
+
 if [ "$LOGROTATE_ENABLED" = "1" ]; then
-	unbuffer /steamcmd/rust/RustDedicated $RUST_STARTUP_COMMAND "${ARGUMENTS[@]}" 2>&1 | grep --line-buffered -Ev '^\s*$|Filename' | tee $RUST_SERVER_LOG_FILE &
+	stdbuf -oL /rust/RustDedicated "${RUST_STARTUP_COMMAND}" "${ARGUMENTS[@]}" 2>&1 | grep --line-buffered -Ev '^\s*$|Filename' | tee $RUST_SERVER_LOG_FILE &
 elif [ "$STDLOG_ENABLED" = "1" ]; then
-	/steamcmd/rust/RustDedicated $RUST_STARTUP_COMMAND "${ARGUMENTS[@]}" 2>&1 &
+	/rust/RustDedicated "${RUST_STARTUP_COMMAND}" "${ARGUMENTS[@]}" 2>&1 &
 else
-	/steamcmd/rust/RustDedicated $RUST_STARTUP_COMMAND "${ARGUMENTS[@]}" &
+	/rust/RustDedicated "${RUST_STARTUP_COMMAND}" "${ARGUMENTS[@]}" &
 fi
 
 child=$!
 wait "$child"
 
 echo "Exiting.."
-exit
+exit 0
